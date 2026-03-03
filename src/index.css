@@ -604,3 +604,5 @@ tbody tr:hover { background: #f8fafc; }
 
   .nav-links a span { display: none; }
 }
+
+/* Mantener el mismo tamaño y estilo que el cuadrado original */ .brand-icon { width: 34px; height: 34px; display: inline-block; border-radius: .5rem; overflow: hidden; background: linear-gradient(135deg, var(--accent-blue), var(--accent-green)); /* opcional: mantiene el degradado si SVG tiene transparencia */ flex: 0 0 34px; align-items: center; justify-content: center; } /* Ajuste interno para la imagen */ .brand-icon img, .brand-icon > img { width: 100%; height: 100%; object-fit: contain; display: block; }

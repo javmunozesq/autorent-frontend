@@ -3,8 +3,8 @@ import Header from './components/layout/header'
 import Footer from './components/layout/footer'
 import Dashboard from './pages/Dashboard'
 import { NuevoCliente, EditarCliente } from './pages/clientes'
-import { Vehiculos, NuevoVehiculo, EditarVehiculo } from './pages/vehiculos'
-import { Reservas, NuevaReserva, EditarReserva } from './pages/reservas'
+import { Vehiculos, NuevoVehiculo, EditarVehiculo } from "./pages/vehiculos";
+import { Reservas, NuevaReserva, EditarReserva } from "./pages/reservas";
 
 export default function App() {
   return (

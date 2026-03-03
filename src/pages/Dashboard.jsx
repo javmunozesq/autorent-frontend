@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { clientesApi, vehiculosApi, reservasApi } from '../../api'
-import { LoadingSpinner, ConfirmModal, StatusBadge } from '../../components/ui'
+import { clientesApi, vehiculosApi, reservasApi } from '../api'
+import { LoadingSpinner, ConfirmModal, StatusBadge } from '../components/ui'
 
 export default function Dashboard() {
   const [clientes, setClientes] = useState([])

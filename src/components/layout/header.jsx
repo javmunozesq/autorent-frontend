@@ -6,7 +6,7 @@ export default function Header() {
       <div className="container">
         <div className="header-inner">
           <NavLink to="/" className="brand">
-            <span className="brand-icon"><i className="bi bi-car-front-fill" /></span>
+            <img src="/logo_autorent.svg" alt="Autorent" className="brand-icon" />
             Autorent
           </NavLink>
           <nav>

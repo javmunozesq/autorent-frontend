@@ -1,0 +1,73 @@
+# Node modules
+node_modules/
+
+# Build output (Vite)
+dist/
+build/
+out/
+
+# Environment variables (do not commit secrets)
+.env
+.env.*.local
+.env.local
+.env.production.local
+
+# Vite cache / temp
+.vite/
+.cache/
+*.log
+
+# Package manager lockfiles (opcional: normalmente se versionan)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Parcel / other bundlers caches
+.parcel-cache/
+
+# Mac / Linux swap
+*~
+*.swp
+
+# Generated assets (if you generate icons, svgs, etc. during build)
+public/build/
+public/assets/
+
+# Optional: ignore local secrets or credentials folder
+secrets/
+.env-secrets/
+
+# Optional: ignore local database files
+*.sqlite
+*.db
+
+# Ignore VS Code workspace storage (if present)
+.vscode-test/
+
+# Ignore JetBrains IDE caches
+.idea/
+out/

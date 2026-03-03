@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { vehiculosApi } from '../../api'
+import { vehiculosApi, reservasApi } from '../../api'
 import { LoadingSpinner, StatusBadge, ConfirmModal } from '../../components/ui'
 
 export default function Vehiculos() {
@@ -9,20 +9,50 @@ export default function Vehiculos() {
   const [categorias, setCategorias] = useState([])
   const [loading, setLoading] = useState(true)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [error, setError] = useState(null)
 
   const load = async () => {
     setLoading(true)
+    setError(null)
     try {
-      const [v, m, c] = await Promise.all([
-        vehiculosApi.getAll(),
-        vehiculosApi.getModelos(),
-        vehiculosApi.getCategorias(),
+      // Cargar vehículos primero (es crítico)
+      const v = await vehiculosApi.getAll()
+      console.log("vehiculos raw:", v)
+
+      // Intentos independientes para modelos, categorías y reservas.
+      // Usamos Promise.allSettled para que un 404/500 en modelos/categorias no rompa todo.
+      const results = await Promise.allSettled([
+        // métodos pueden estar en vehiculosApi o en otros módulos; aquí usamos vehiculosApi.getModelos/getCategorias
+        (vehiculosApi.getModelos ? vehiculosApi.getModelos() : Promise.resolve([])),
+        (vehiculosApi.getCategorias ? vehiculosApi.getCategorias() : Promise.resolve([])),
+        (reservasApi.getAll ? reservasApi.getAll() : Promise.resolve([])),
       ])
-      setVehiculos(v)
-      setModelos(m)
-      setCategorias(c)
+
+      const modelosResp = results[0].status === 'fulfilled' ? results[0].value : []
+      const categoriasResp = results[1].status === 'fulfilled' ? results[1].value : []
+      const reservasResp = results[2].status === 'fulfilled' ? results[2].value : []
+
+      if (results[0].status === 'rejected') console.warn("Modelos no cargados:", results[0].reason)
+      if (results[1].status === 'rejected') console.warn("Categorías no cargadas:", results[1].reason)
+      if (results[2].status === 'rejected') console.warn("Reservas no cargadas:", results[2].reason)
+
+      // Crear set de vehiculos reservados (ajusta el campo según tu API: aquí asumimos reserva.vehiculo_id)
+      const vehiculosReservados = new Set(
+        (Array.isArray(reservasResp) ? reservasResp : []).map(r => Number(r.vehiculo_id))
+      )
+
+      // Añadir flag 'reservado' a cada vehículo
+      const vehiculosConFlag = (Array.isArray(v) ? v : []).map(item => ({
+        ...item,
+        reservado: vehiculosReservados.has(Number(item.id))
+      }))
+
+      setVehiculos(vehiculosConFlag)
+      setModelos(Array.isArray(modelosResp) ? modelosResp : [])
+      setCategorias(Array.isArray(categoriasResp) ? categoriasResp : [])
     } catch (e) {
-      console.error(e)
+      console.error("Error cargando datos de vehículos:", e)
+      setError(e.message || String(e))
     } finally {
       setLoading(false)
     }
@@ -58,6 +88,12 @@ export default function Vehiculos() {
 
         <section className="section-card">
           <div style={{ padding: 0 }}>
+            {error && (
+              <div style={{ padding: 12, color: 'var(--danger)', background: 'rgba(255,0,0,0.03)', marginBottom: 12 }}>
+                Error cargando datos: {error}
+              </div>
+            )}
+
             {vehiculos.length === 0 ? (
               <div className="empty-state">
                 <i className="bi bi-car-front" />
@@ -94,8 +130,11 @@ export default function Vehiculos() {
                           </td>
                           <td>{v.color || '-'}</td>
                           <td>{v.kilometraje || 0}</td>
-                          <td><StatusBadge status={v.estado} /></td>
-                          <td>{parseFloat(v.precio_dia).toFixed(2)} €</td>
+                          <td style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <StatusBadge status={v.estado} />
+                            {v.reservado && <span className="badge badge-warning" title="Vehículo con reserva">Reservado</span>}
+                          </td>
+                          <td>{Number(v.precio_dia || 0).toFixed(2)} €</td>
                           <td>{v.ubicacion || '-'}</td>
                           <td className="text-end">
                             <Link
