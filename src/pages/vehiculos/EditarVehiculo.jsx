@@ -4,6 +4,7 @@ import { vehiculosApi } from '../../api'
 import VehiculoForm from '../../components/vehiculos/VehiculoForm'
 import { AlertSuccess } from '../../components/ui'
 
+
 export default function EditarVehiculo() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -13,23 +14,47 @@ export default function EditarVehiculo() {
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
+    setLoading(true)
     Promise.all([
-      vehiculosApi.getById(id),
-      vehiculosApi.getModelos(),
+      vehiculosApi.getById(id).catch(err => { console.error('vehiculosApi.getById error', err); return null }),
+      vehiculosApi.getModelos().catch(err => { console.error('vehiculosApi.getModelos error', err); return [] }),
     ])
-      .then(([v, m]) => {
-        setInitial({
-          ...v,
-          modelo_id: String(v.modelo_id ?? ''),
-          kilometraje: v.kilometraje ?? 0,
-          precio_dia: v.precio_dia != null ? String(v.precio_dia) : '',
-          vin: v.vin ?? '',
-          color: v.color ?? '',
-          ubicacion: v.ubicacion ?? '',
-        })
+      .then(([vRaw, mRaw]) => {
+        console.debug('EditarVehiculo - raw responses:', { vRaw, mRaw })
+
+        const unwrap = (x) => {
+          if (x == null) return null
+          return x.data !== undefined ? x.data : x
+        }
+
+        const v = unwrap(vRaw)
+        const m = Array.isArray(unwrap(mRaw)) ? unwrap(mRaw) : []
+
+        console.debug('EditarVehiculo - unwrapped:', { v, modelosCount: m.length })
+
+        if (!v) {
+          console.error('EditarVehiculo: vehículo no encontrado o formato inesperado', vRaw)
+          setInitial(null)
+        } else {
+          setInitial({
+            id: v.id,
+            matricula: v.matricula ?? '',
+            vin: v.vin ?? '',
+            modelo_id: v.modelo_id != null ? String(v.modelo_id) : (v.modeloId != null ? String(v.modeloId) : ''),
+            color: v.color ?? '',
+            kilometraje: v.kilometraje != null ? String(v.kilometraje) : '0',
+            estado: v.estado ?? 'disponible',
+            precio_dia: v.precio_dia != null ? String(v.precio_dia) : (v.precioDia != null ? String(v.precioDia) : ''),
+            ubicacion: v.ubicacion ?? '',
+          })
+        }
+
         setModelos(m)
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error('Error Promise.all EditarVehiculo:', err)
+        setInitial(null)
+      })
       .finally(() => setLoading(false))
   }, [id])
 
@@ -59,7 +84,7 @@ export default function EditarVehiculo() {
               </div>
               <div className="card-body">
                 <AlertSuccess message={success} />
-                {initial && (
+                {initial ? (
                   <VehiculoForm
                     initial={initial}
                     modelos={modelos}
@@ -67,6 +92,8 @@ export default function EditarVehiculo() {
                     submitLabel="Guardar Cambios"
                     cancelHref="/vehiculos"
                   />
+                ) : (
+                  <div>Datos no disponibles para editar.</div>
                 )}
               </div>
               <div className="card-footer-note">Los campos marcados con * son obligatorios</div>

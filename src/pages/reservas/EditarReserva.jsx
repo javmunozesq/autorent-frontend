@@ -15,35 +15,63 @@ export default function EditarReserva() {
   const [success, setSuccess] = useState('')
 
   useEffect(() => {
-    Promise.all([
-      reservasApi.getById(id),
-      clientesApi.getAll(),
-      vehiculosApi.getAll(),
-      empleadosApi.getAll(),
+    setLoading(true)
+    Promise.allSettled([
+      reservasApi.getById(id).catch(err => { console.error('reservasApi.getById error', err); return null }),
+      clientesApi.getAll().catch(err => { console.error('clientesApi.getAll error', err); return [] }),
+      vehiculosApi.getAll().catch(err => { console.error('vehiculosApi.getAll error', err); return [] }),
+      empleadosApi.getAll().catch(err => { console.error('empleadosApi.getAll error', err); return [] }),
     ])
-      .then(([r, c, v, e]) => {
-        setInitial({
-          cliente_id:     String(r.cliente_id ?? ''),
-          vehiculo_id:    String(r.vehiculo_id ?? ''),
-          empleado_id:    String(r.empleado_id ?? ''),
-          estado:         r.estado ?? 'confirmada',
-          fecha_inicio:   r.fecha_inicio?.slice(0, 10) ?? '',
-          fecha_fin:      r.fecha_fin?.slice(0, 10) ?? '',
-          total_estimado: r.total_estimado != null ? String(r.total_estimado) : '',
-          notas:          r.notas ?? '',
-        })
-        setClientes(c)
-        setVehiculos(v)
-        setEmpleados(e)
+      .then(([rRes, cRes, vRes, eRes]) => {
+        const unwrap = (x) => (x == null ? null : (x.data !== undefined ? x.data : x))
+        const r = unwrap(rRes?.value ?? rRes)
+        const c = unwrap(cRes?.value ?? cRes) || []
+        const v = unwrap(vRes?.value ?? vRes) || []
+        const e = unwrap(eRes?.value ?? eRes) || []
+
+        const toDate = (s) => {
+          if (!s) return ''
+          return String(s).slice(0, 10).replace(' ', 'T') // keep YYYY-MM-DD
+        }
+
+        if (!r) {
+          console.error('EditarReserva: reserva no encontrada', rRes)
+          setInitial(null)
+        } else {
+          setInitial({
+            cliente_id:     String(r.cliente_id ?? r.clienteId ?? ''),
+            vehiculo_id:    String(r.vehiculo_id ?? r.vehiculoId ?? ''),
+            empleado_id:    (r.empleado_id ?? r.empleadoId) != null ? String(r.empleado_id ?? r.empleadoId) : '',
+            estado:         r.estado ?? 'pendiente',
+            fecha_inicio:   toDate(r.fecha_inicio ?? r.fechaInicio),
+            fecha_fin:      toDate(r.fecha_fin ?? r.fechaFin),
+            total_estimado: (r.total_estimado ?? r.totalEstimado) != null ? String(r.total_estimado ?? r.totalEstimado) : '',
+            notas:          r.notas ?? '',
+          })
+        }
+
+        setClientes(Array.isArray(c) ? c : [])
+        setVehiculos(Array.isArray(v) ? v : [])
+        setEmpleados(Array.isArray(e) ? e : [])
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error('Error Promise.all EditarReserva:', err)
+        setInitial(null)
+      })
       .finally(() => setLoading(false))
   }, [id])
 
   const handleSubmit = async (data) => {
-    await reservasApi.update(id, data)
-    setSuccess('Reserva actualizada correctamente.')
-    setTimeout(() => navigate('/reservas'), 1500)
+    try {
+      const updated = await reservasApi.update(id, data) // devuelve payload
+      setSuccess('Reserva actualizada correctamente.')
+      // navegar pasando el objeto actualizado para que la lista lo use
+      setTimeout(() => navigate('/reservas', { state: { refresh: true, updated } }), 900)
+      return updated
+    } catch (err) {
+      console.error('Error actualizar reserva:', err)
+      throw err
+    }
   }
 
   if (loading) return (
@@ -66,7 +94,7 @@ export default function EditarReserva() {
               </div>
               <div className="card-body">
                 <AlertSuccess message={success} />
-                {initial && (
+                {initial ? (
                   <ReservaForm
                     initial={initial}
                     clientes={clientes}
@@ -76,6 +104,8 @@ export default function EditarReserva() {
                     submitLabel="Guardar Cambios"
                     cancelHref="/reservas"
                   />
+                ) : (
+                  <div>Datos no disponibles para editar.</div>
                 )}
               </div>
               <div className="card-footer-note">Los campos marcados con * son obligatorios</div>

@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertErrors } from '../ui'
+import request from '../../api/request' // para fallback si el padre no pasa listas
 
 const EMPTY = {
   cliente_id: '', vehiculo_id: '', empleado_id: '',
@@ -20,10 +21,51 @@ function validate(f) {
   return errs
 }
 
-export default function ReservaForm({ initial = EMPTY, clientes = [], vehiculos = [], empleados = [], onSubmit, submitLabel, cancelHref }) {
+export default function ReservaForm({ initial = EMPTY, clientes = [], vehiculos = [], empleados = [], onSubmit, submitLabel = 'Guardar', cancelHref = '/reservas' }) {
   const [fields, setFields] = useState({ ...EMPTY, ...initial })
   const [errors, setErrors] = useState([])
   const [submitting, setSubmitting] = useState(false)
+
+  // sincronizar cuando cambie la prop initial (llega después del primer render)
+  useEffect(() => {
+    setFields(f => ({ ...f, ...EMPTY, ...(initial || {}) }))
+  }, [initial])
+
+  // mantener listas locales si el padre no las pasa o vienen vacías
+  const [localClientes, setLocalClientes] = useState(Array.isArray(clientes) ? clientes : [])
+  const [localVehiculos, setLocalVehiculos] = useState(Array.isArray(vehiculos) ? vehiculos : [])
+  const [localEmpleados, setLocalEmpleados] = useState(Array.isArray(empleados) ? empleados : [])
+
+  useEffect(() => { if (Array.isArray(clientes) && clientes.length > 0) setLocalClientes(clientes) }, [clientes])
+  useEffect(() => { if (Array.isArray(vehiculos) && vehiculos.length > 0) setLocalVehiculos(vehiculos) }, [vehiculos])
+  useEffect(() => { if (Array.isArray(empleados) && empleados.length > 0) setLocalEmpleados(empleados) }, [empleados])
+
+  // fallback defensivo: si las listas vienen vacías, intentar cargarlas localmente
+  useEffect(() => {
+    let mounted = true
+    async function loadFallbacks() {
+      try {
+        if ((!localClientes || localClientes.length === 0)) {
+          const c = await request('/clientes')
+          if (mounted && Array.isArray(c)) setLocalClientes(c)
+        }
+        if ((!localVehiculos || localVehiculos.length === 0)) {
+          const v = await request('/vehiculos')
+          if (mounted && Array.isArray(v)) setLocalVehiculos(v)
+        }
+        if ((!localEmpleados || localEmpleados.length === 0)) {
+          const e = await request('/empleados')
+          if (mounted && Array.isArray(e)) setLocalEmpleados(e)
+        }
+      } catch (err) {
+        // no crítico: el formulario seguirá mostrando lo que tenga
+        console.warn('ReservaForm fallback load failed', err)
+      }
+    }
+    loadFallbacks()
+    return () => { mounted = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const set = (k) => (e) => setFields(f => ({ ...f, [k]: e.target.value }))
 
@@ -34,15 +76,22 @@ export default function ReservaForm({ initial = EMPTY, clientes = [], vehiculos 
     setErrors([])
     setSubmitting(true)
     try {
-      await onSubmit({
+      const payload = {
         ...fields,
         cliente_id: parseInt(fields.cliente_id),
         vehiculo_id: parseInt(fields.vehiculo_id),
         empleado_id: fields.empleado_id ? parseInt(fields.empleado_id) : null,
         total_estimado: fields.total_estimado !== '' ? parseFloat(fields.total_estimado) : null,
-      })
-    } catch (err) { setErrors([err.message]) }
-    finally { setSubmitting(false) }
+      }
+      // onSubmit del padre debe devolver la respuesta del servidor (payload)
+      const res = await onSubmit(payload)
+      return res
+    } catch (err) {
+      setErrors([err?.message || String(err)])
+      throw err
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -57,7 +106,7 @@ export default function ReservaForm({ initial = EMPTY, clientes = [], vehiculos 
           <select id="cliente_id" className="form-select" required
             value={fields.cliente_id} onChange={set('cliente_id')}>
             <option value="">-- Seleccione cliente --</option>
-            {clientes.map(c => (
+            {localClientes.map(c => (
               <option key={c.id} value={c.id}>
                 {c.nombre} {c.apellido} {c.email ? `— ${c.email}` : ''}
               </option>
@@ -72,7 +121,7 @@ export default function ReservaForm({ initial = EMPTY, clientes = [], vehiculos 
           <select id="vehiculo_id" className="form-select" required
             value={fields.vehiculo_id} onChange={set('vehiculo_id')}>
             <option value="">-- Seleccione vehículo --</option>
-            {vehiculos.map(v => (
+            {localVehiculos.map(v => (
               <option key={v.id} value={v.id}>
                 {v.matricula} {(v.marca || v.modelo_nombre) ? `— ${v.marca ?? ''} ${v.modelo_nombre ?? ''}` : ''} {v.estado ? `(${v.estado})` : ''}
               </option>
@@ -87,7 +136,7 @@ export default function ReservaForm({ initial = EMPTY, clientes = [], vehiculos 
           <select id="empleado_id" className="form-select"
             value={fields.empleado_id} onChange={set('empleado_id')}>
             <option value="">-- Ninguno --</option>
-            {empleados.map(e => (
+            {localEmpleados.map(e => (
               <option key={e.id} value={e.id}>
                 {e.nombre} {e.apellido} {e.puesto ? `— ${e.puesto}` : ''}
               </option>
